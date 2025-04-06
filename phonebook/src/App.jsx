@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import personService from './services/persons'
 
 const Filter = ({filter, onChange}) => {
   return (
@@ -25,48 +25,64 @@ const PersonForm = ({onSubmit, name, onNameChange, number, onNumberChange}) => {
   )
 }
 
-const Persons = ({persons}) => {
+const Persons = ({persons, onDelete}) => {
   return (
     <div>
-      { persons.map(person => (<p key={person.name}>{person.name} {person.number}</p>)) }
+      { persons.map(person => <Person key={person.id} person={person} onDelete={() => onDelete(person.id)} />) }
     </div>
   )
 }
 
+const Person = ({person, onDelete}) => {
+  return <div>
+    {person.name} {person.number}
+    <button onClick={onDelete}>delete</button>
+  </div>
+}
+
 const App = () => {
   const [persons, setPersons] = useState([])
-  const [showPersons, setShowPersons] = useState(persons)
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
   const [nameFilter, setNameFilter] = useState('')
 
   useEffect(() => {
-    axios.get('http://localhost:3001/persons')
-    .then(response => {
-      console.log(response.data)
-      setPersons(response.data)
-      setShowPersons(getShowPersons(response.data, nameFilter))
+    personService.getAll()
+    .then(data => {
+      console.log(data)
+      setPersons(data)
     })
   }, [])
 
   const getShowPersons = (persons, filter) => {
-    let ret = persons
-    if (filter.length > 0) {
-      const upper_filter = filter.toUpperCase()
-      ret = persons.filter((person) => person.name.toUpperCase().includes(upper_filter))
+    if (filter.length === 0) {
+      return persons
     }
-    console.log(`filter = ${filter} persons = ${persons}, output = ${ret}`)
-    return ret
+    console.log(`filter = ${filter} persons = ${persons}`)
+    return persons.filter((person) => person.name.toUpperCase().includes(filter.toUpperCase()))
   }
+
+  const showPersons = getShowPersons(persons, nameFilter)
+
   const addPerson = (event) => {
     event.preventDefault()
     console.log('on submit.....')
-
-    if (persons.find((person) => person.name === newName) != undefined) {
+    
+    const person = persons.find((person) => person.name === newName)
+    if (person != undefined) {
       console.log(newName, "is existed")
-      alert(`${newName} is already added to phonebook`)
-      setNewName('')
-      setNewNumber('')
+      if (!window.confirm(`${newName} is already added to phonebook. Replace the new number with the new once?`)) {
+        setNewName('')
+        setNewNumber('')
+        return
+      }
+      const updatePerson = {...person, number: newNumber}
+      personService.update(updatePerson.id, updatePerson)
+        .then(data =>{
+          setPersons(persons.map(person => person.id === data.id ? data : person))
+          setNewName('')
+          setNewNumber('')    
+        })
       return
     }
     
@@ -74,11 +90,11 @@ const App = () => {
       name: newName,
       number: newNumber
     }
-    const newPersons = persons.concat(newPerson)
-    setPersons(newPersons)
-    setShowPersons(getShowPersons(newPersons, nameFilter))
-    setNewName('')
-    setNewNumber('')
+    personService.create(newPerson).then(data => {
+      setPersons(persons.concat(data))
+      setNewName('')
+      setNewNumber('')
+    })
   }
 
   const onNewNameChange = (event) => {
@@ -94,7 +110,18 @@ const App = () => {
   const onNameFilterChange = (event) => {
     console.log(event.target.value)
     setNameFilter(event.target.value)
-    setShowPersons(getShowPersons(persons, event.target.value))
+  }
+
+  const onDelete = (id) => {
+    console.log(`on delete ${id}`)
+    const person = persons.find(person => person.id === id)
+    if (!window.confirm(`Delete ${person.name}`)) {
+      return
+    }
+    personService.remove(id).then(resp => {
+      console.log("delete resp", resp)
+      setPersons(persons.filter(person => person.id !== id))
+    })
   }
 
   return (
@@ -107,7 +134,7 @@ const App = () => {
         number={newNumber} onNumberChange={onNewNumberChange}
       />
       <h3>Numbers</h3>
-      <Persons persons={showPersons}/>
+      <Persons persons={showPersons} onDelete={onDelete}/>
     </div>
   )
 }
