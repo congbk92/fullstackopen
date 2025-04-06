@@ -40,11 +40,23 @@ const Person = ({person, onDelete}) => {
   </div>
 }
 
+const Notification = ({message, errorMessage}) => {
+  if (message === null && errorMessage == null) {
+    return null
+  }
+  if (message !== null) {
+    return <div className='message'>{message}</div>
+  }
+  return <div className='error'>{errorMessage}</div>
+}
+
 const App = () => {
   const [persons, setPersons] = useState([])
   const [newName, setNewName] = useState('')
   const [newNumber, setNewNumber] = useState('')
   const [nameFilter, setNameFilter] = useState('')
+  const [notiMessage, setNotiMessage] = useState(null)
+  const [errorMessage, setErrorMessage] = useState(null)
 
   useEffect(() => {
     personService.getAll()
@@ -81,7 +93,11 @@ const App = () => {
         .then(data =>{
           setPersons(persons.map(person => person.id === data.id ? data : person))
           setNewName('')
-          setNewNumber('')    
+          setNewNumber('')
+          setNotiMessage(`Updated ${data.name}`)
+          setTimeout(() => {
+            setNotiMessage(null)
+          }, 5000)
         })
       return
     }
@@ -94,6 +110,10 @@ const App = () => {
       setPersons(persons.concat(data))
       setNewName('')
       setNewNumber('')
+      setNotiMessage(`Added ${data.name}`)
+      setTimeout(() => {
+        setNotiMessage(null)
+      }, 5000)
     })
   }
 
@@ -118,15 +138,29 @@ const App = () => {
     if (!window.confirm(`Delete ${person.name}`)) {
       return
     }
-    personService.remove(id).then(resp => {
-      console.log("delete resp", resp)
-      setPersons(persons.filter(person => person.id !== id))
-    })
+    personService
+      .remove(id)
+      .then(resp => {
+        console.log("delete resp", resp)
+        setNotiMessage(`Deleted ${person.name}`)
+        setTimeout(() => {
+          setNotiMessage(null)
+        }, 5000)
+        setPersons(persons.filter(person => person.id !== id))
+      })
+      .catch(error => {
+        setErrorMessage(`${person.name} already has been removed from server`)
+        setTimeout(() => {
+          setErrorMessage(null)
+        }, 5000)
+        setPersons(persons.filter(person => person.id !== id))
+      })
   }
 
   return (
     <div>
       <h2>Phonebook</h2>
+      <Notification message={notiMessage} errorMessage={errorMessage}/>
       <Filter filter={nameFilter} onChange={onNameFilterChange}/>
       <h3>Add New</h3>
       <PersonForm onSubmit={addPerson} 
