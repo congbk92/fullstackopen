@@ -20,8 +20,37 @@ const Flag = ({flag}) => {
   )
 }
 
-const CountryDetail = ({country}) => {
+const CountryDetail = ({countryName}) => {
+  const [country, setCountry] = useState(null)
+  useEffect(() => {
+    countryService.getCountryInfo(countryName).then(country => {
+      console.log("country: ", country)
+      const newCountry = {
+        name: country.name.common,
+        capital: country.capital ? country.capital[0] : country.name.common,
+        area: country.area,
+        languages: Object.values(country.languages),
+        flags: country.flags,
+        lat: country.latlng[0],
+        lon: country.latlng[1],
+      }
+      weatherService.getWeather(newCountry.lat, newCountry.lon).then(data =>{
+        console.log("weather: ", data)
+        const countryWithWeather = {...newCountry,
+          temp: data.main.temp,
+          weatherIconUrl: data.weatherIconUrl,
+          weatherDes: data.weather[0].description,
+          wind: data.wind.speed
+        }
+        setCountry(countryWithWeather)
+      })
+    })
+  }, [countryName])
+
   console.log("In Country component: ", country)
+  if (!country) {
+    return
+  }
   return (
     <div>
       <h1>{country.name}</h1>
@@ -48,7 +77,6 @@ const Country = ({name, onShowClick}) => {
 const App = () => {
   const [filterCountry, setFilterCountry] = useState('')
   const [allCountries, setAllCountries] = useState([])
-  const [country, setCountry] = useState(null)
   const [countries, setCountries] = useState([])
   
   const onChangeFilterCountry = (event) => {
@@ -68,46 +96,16 @@ const App = () => {
     })
   }, [])
 
-  useEffect(() => {
-    if (countries.length === 1 && country && country.name === countries[0]) {
-      return
-    }
-    if (countries.length == 1) {
-      countryService.getCountryInfo(countries[0]).then(country => {
-        console.log("country: ", country)
-        const newCountry = {
-          name: country.name.common,
-          capital: country.capital ? country.capital[0] : country.name.common,
-          area: country.area,
-          languages: Object.values(country.languages),
-          flags: country.flags,
-          lat: country.latlng[0],
-          lon: country.latlng[1],
-        }
-        weatherService.getWeather(newCountry.lat, newCountry.lon).then(data =>{
-          console.log("weather: ", data)
-          const countryWithWeather = {...newCountry,
-            temp: data.main.temp,
-            weatherIconUrl: data.weatherIconUrl,
-            weatherDes: data.weather[0].description,
-            wind: data.wind.speed
-          }
-          setCountry(countryWithWeather)
-        })
-      })
-    }
-  }, [countries])
-
   const onShowCountry = (country) => {
     console.log(`Clicked show ${country}`)
     setCountries([country])
   }
 
-  if (countries.length === 1 && country && countries[0] == country.name) {
+  if (countries.length === 1) {
     return (
       <div>
         <Search filter={filterCountry} onChangeFilter={onChangeFilterCountry} />
-        <CountryDetail country={country} />
+        <CountryDetail countryName={countries[0]} />
       </div>
     )
   } else if (countries.length > 1 && countries.length <= 10) {
